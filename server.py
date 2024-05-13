@@ -1,27 +1,24 @@
 import socket
 import threading
 
-client_connections = []
+listener_ports = []
 
 def receive_messages(conn, addr):
-    print("rec called")
     while True:
-        data = conn.recv(1024).decode()
-        if not data:
-            break
-        print("Received message from", addr, ":", data)
+        try:
+            data = conn.recv(1024).decode()
+            listener_ports.append(int(data))
+            if not data:
+                break
+            else:
+                conn.send((str(listener_ports[:-1])).encode())
 
-def send_messages():
-    while True:
-        message = input("Enter message: ")
-        print("send called")
-        for conn in client_connections:
-            print(len(client_connections))
-            conn.send(message.encode())
+        except ConnectionResetError:
+            print("Connection with", addr, "reset by peer.")
+            break
 
 def handle_client(conn, addr):
     print("Connection from:", addr)
-    client_connections.append(conn)
     receive_thread = threading.Thread(target=receive_messages, args=(conn, addr))
     receive_thread.start()
 
@@ -30,11 +27,8 @@ def main():
     port = 55555
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((host, port))
-    server_socket.listen(2)  # Listen for up to 2 connections
+    server_socket.listen(3)
     print("Waiting for connections...")
-
-    send_thread = threading.Thread(target=send_messages)
-    send_thread.start()
 
     while True:
         conn, addr = server_socket.accept()
