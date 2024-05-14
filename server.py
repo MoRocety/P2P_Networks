@@ -1,17 +1,19 @@
 import socket
 import threading
 
-listener_ports = []
+listener_ports = {}
 
 def receive_messages(conn, addr):
     while True:
         try:
             data = conn.recv(1024).decode()
-            listener_ports.append(int(data))
+            username = data.split(",")[0]
+            listener_port = int(data.split(",")[1])
+            listener_ports[username] = listener_port
             if not data:
                 break
             else:
-                conn.send((str(listener_ports[:-1])).encode())
+                conn.send((str(listener_ports)).encode())
 
         except ConnectionResetError:
             print("Connection with", addr, "reset by peer.")
