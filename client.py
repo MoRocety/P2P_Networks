@@ -16,54 +16,46 @@ def receive_messages(p2p_conn):
         print("Received message:", data)
 
 # Only sends to the p2p connection unless the user wants to send to the server, calls server_communication in that case
-def send_messages(username, client_socket, listener_port, p2p_conn):
+def send_messages(username, server_socket_, listener_port):
+    socket_ = None
+
     while True:
         message = input("Enter your message: ")
+
         if message.split(" ")[0] == "/server":
-            server_thread = threading.Thread(target=server_communication, args=(username, client_socket, listener_port,))
-            server_thread.start()
-            server_thread.join()
+            socket_ = server_socket_
+            socket_.send("/server".encode())
+            data = ast.literal_eval(socket_.recv(1024).decode())
+            other_listener_ports = {x:data[x] for x in data if data[x] != listener_port}
+
+            if other_listener_ports:
+                print(other_listener_ports)
+                chosen_username = input("Pick your poison: ")
+                chosen_port = other_listener_ports[chosen_username]
+                print("Connecting to port:", chosen_port)
+
+                if chosen_username in connections:
+                    socket_ = connections[chosen_username]
+                
+                else:
+                    socket_ = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    socket_.connect((host, chosen_port))
+                    connections[chosen_username] = socket_
+
+                server_thread = threading.Thread(target=receive_messages, args=(socket_,))
+                server_thread.start()
+
+            else:
+                print("No other peers available.")
         
         else:
-            p2p_conn.send(message.encode())
+            if socket_ is not None:
+                socket_.send(message.encode())
 
-# Sets up a p2p connection with another client whenever called
-def server_communication(username, client_socket, listener_port):
-    # Send listener port number
-    client_socket.send(f"{username},{listener_port}".encode())
+            else:
+                print("Not connected to anyone yet.")
 
-    # Receive and process other listener port numbers
-    data = ast.literal_eval(client_socket.recv(1024).decode())
-    other_listener_ports = {x:data[x] for x in data if data[x] != listener_port}
-
-    print(other_listener_ports)
-    
-    if other_listener_ports:
-        chosen_username = input("Pick your poison: ")
-        chosen_port = other_listener_ports[chosen_username]
-        print("Connecting to port:", chosen_port)
-
-        if chosen_username in connections:
-            p2p_socket = connections[chosen_username]
-        
-        else:
-            p2p_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            p2p_socket.connect((host, chosen_port))
-            connections[chosen_username] = p2p_socket
-        
-        receive_thread = threading.Thread(target=receive_messages, args=(p2p_socket,))
-        send_thread = threading.Thread(target=send_messages, args=(username, client_socket, listener_port, p2p_socket,))
-        
-        receive_thread.start()
-        send_thread.start()
-        
-        receive_thread.join()
-        send_thread.join()
-    else:
-        print("No other peers available.")
-
-def listener_handler(username, client_socket, listener_port, listener_socket):
-    # changes need to be made here to listen for multiple connections, implement similar architecture to what server had for this, use a list and a /username mechanism to communicate with desired connection
+def listener_handler(username, listener_socket):
     listener_socket.listen(2)
     print("Waiting for connections...")
 
@@ -71,12 +63,9 @@ def listener_handler(username, client_socket, listener_port, listener_socket):
         p2p_conn, _ = listener_socket.accept()
         connections[username] = p2p_conn
 
-        # Listener should add that connection to connections list but not immediately switch to that connection, maybe not start a new sending thread?
-
         # Send and receive here via p2p_conn
         receive_thread = threading.Thread(target=receive_messages, args=(p2p_conn, ))
         receive_thread.start()
-
     
 def main():
     # Client to server connection
@@ -90,16 +79,17 @@ def main():
 
     username = input("Enter your username: ")
 
-    # So it does not block the server communication but still sets up listener
-    listener_thread = threading.Thread(target=listener_handler, args=(username, client_socket, listener_port, listener_socket, ))
-    listener_thread.start()
-
-    server_thread = threading.Thread(target=server_communication, args=(username, client_socket, listener_port,))
-    server_thread.start()
-
-    listener_thread.join()
-    server_thread.join()
+    client_socket.send(f"{username},{listener_port}".encode())
     
+    # Receive and process other listener port numbers
+    send_thread = threading.Thread(target=send_messages, args=(username, client_socket, listener_port,))
+    send_thread.start()
+
+    # So it does not block the server communication but still sets up listener
+    listener_thread = threading.Thread(target=listener_handler, args=(username, listener_socket,))
+    listener_thread.start()
+    listener_thread.join()
+
     client_socket.close()
 
 if __name__ == "__main__":

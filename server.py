@@ -7,13 +7,16 @@ def receive_messages(conn, addr):
     while True:
         try:
             data = conn.recv(1024).decode()
-            username = data.split(",")[0]
-            listener_port = int(data.split(",")[1])
-            listener_ports[username] = listener_port
-            if not data:
-                break
-            else:
+
+            if data == "/server":
                 conn.send((str(listener_ports)).encode())
+
+            else:
+                username = data.split(",")[0]
+                listener_port = int(data.split(",")[1])
+                listener_ports[username] = listener_port                
+
+            print(data, listener_ports)
 
         except ConnectionResetError:
             print("Connection with", addr, "reset by peer.")
@@ -29,7 +32,7 @@ def main():
     port = 55555
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((host, port))
-    server_socket.listen(3)
+    server_socket.listen(4)
     print("Waiting for connections...")
 
     while True:
