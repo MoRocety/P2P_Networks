@@ -6,6 +6,7 @@ host = '127.0.0.1'
 central_server_port = 55555
 connections = {}
 
+
 # Only receives from the p2p connection
 def receive_messages(p2p_conn):
     while True:
@@ -14,6 +15,7 @@ def receive_messages(p2p_conn):
             break
         
         print("Received message:", data)
+
 
 # Only sends to the p2p connection unless the user wants to send to the server, calls server_communication in that case
 def send_messages(username, server_socket_, listener_port):
@@ -55,8 +57,9 @@ def send_messages(username, server_socket_, listener_port):
             else:
                 print("Not connected to anyone yet.")
 
+
 def listener_handler(username, listener_socket):
-    listener_socket.listen(2)
+    listener_socket.listen(3)
     print("Waiting for connections...")
 
     while True:
@@ -67,6 +70,7 @@ def listener_handler(username, listener_socket):
         receive_thread = threading.Thread(target=receive_messages, args=(p2p_conn, ))
         receive_thread.start()
     
+
 def main():
     # Client to server connection
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -77,8 +81,8 @@ def main():
     listener_socket.bind((host, 0))
     _, listener_port = listener_socket.getsockname()
 
+    # Entering and sending to server
     username = input("Enter your username: ")
-
     client_socket.send(f"{username},{listener_port}".encode())
     
     # Receive and process other listener port numbers
