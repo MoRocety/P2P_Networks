@@ -90,6 +90,12 @@ def signin_clicked(username_edit, password_edit, client_socket, listener_port, d
         print("Please enter both username and password.")
         
     client_socket.send(f"/signin {username},{password},{listener_port}".encode())
+    data = client_socket.recv(1024).decode()
+
+    if data == "True":
+        print("User signed in successfully.")
+        dialog.accept()
+
 
 def signup_clicked(username_edit, password_edit, client_socket):
     username = username_edit.text()

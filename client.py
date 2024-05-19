@@ -26,7 +26,6 @@ def send_messages(username, server_socket_, listener_port):
             socket_ = server_socket_
             socket_.send("/server".encode())
             data = ast.literal_eval(socket_.recv(1024).decode())
-            print(data)
             other_listener_ports = {x:data[x] for x in data if data[x] != listener_port}
 
             if other_listener_ports:
@@ -84,11 +83,10 @@ def main():
     signInDialog.show()
     app.exec_()
 
-    username = ast.literal_eval(client_socket.recv(1024).decode())
+    username = client_socket.recv(1024).decode()
 
     if username:
         print("Sign in successful.")
-        signInDialog.close()
 
         # Receive and process other listener port numbers
         send_thread = threading.Thread(target=send_messages, args=(username, client_socket, listener_port,))

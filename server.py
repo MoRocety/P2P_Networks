@@ -30,6 +30,7 @@ def receive_messages(conn, addr):
                 if success:
                     listener_port = int(fields[2])
                     listener_ports[username] = listener_port
+                    conn.send(str(success).encode())
                 
                 conn.send(username.encode())
 
