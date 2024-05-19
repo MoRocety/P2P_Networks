@@ -1,20 +1,37 @@
 import socket
 import threading
+import database
 
 listener_ports = {}
 
 def receive_messages(conn, addr):
     while True:
         try:
-            data = conn.recv(1024).decode()
+            data = conn.recv(1024).decode().split(" ")
 
-            if data == "/server":
+            if data[0] == "/server":
                 conn.send((str(listener_ports)).encode())
 
-            else:
-                username = data.split(",")[0]
-                listener_port = int(data.split(",")[1])
-                listener_ports[username] = listener_port                
+            elif data[0] == "/signup":
+                fields = data[1].split(",")
+                username = fields[0]
+                password = fields[1]
+
+                success = str(database.signup(username, password))
+                conn.send(success.encode())
+                
+            elif data[0] == "/signin":
+                fields = data[1].split(",")
+                username = fields[0]
+                password = fields[1]
+
+                success = database.signin(username, password)
+
+                if success:
+                    listener_port = int(fields[2])
+                    listener_ports[username] = listener_port
+                
+                conn.send(username.encode())
 
             print(data, listener_ports)
 

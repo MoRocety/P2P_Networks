@@ -1,6 +1,6 @@
-import socket
-import threading
-import ast
+import socket, threading, sys, ast
+from PyQt5.QtWidgets import QApplication, QDialog
+from authenticate import createSignInDialog
 
 host = '127.0.0.1'
 central_server_port = 55555
@@ -15,7 +15,6 @@ def receive_messages(p2p_conn):
         
         print("Received message:", data)
 
-
 # Only sends to the p2p connection unless the user wants to send to the server, calls server_communication in that case
 def send_messages(username, server_socket_, listener_port):
     socket_ = None
@@ -27,6 +26,7 @@ def send_messages(username, server_socket_, listener_port):
             socket_ = server_socket_
             socket_.send("/server".encode())
             data = ast.literal_eval(socket_.recv(1024).decode())
+            print(data)
             other_listener_ports = {x:data[x] for x in data if data[x] != listener_port}
 
             if other_listener_ports:
@@ -69,9 +69,8 @@ def listener_handler(username, listener_socket):
         receive_thread = threading.Thread(target=receive_messages, args=(p2p_conn, ))
         receive_thread.start()
     
-
 def main():
-    # Client to server connection
+    # Client to Server connection
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_socket.connect((host, central_server_port))
 
@@ -80,20 +79,31 @@ def main():
     listener_socket.bind((host, 0))
     _, listener_port = listener_socket.getsockname()
 
-    # Entering and sending to server
-    username = input("Enter your username: ")
-    client_socket.send(f"{username},{listener_port}".encode())
-    
-    # Receive and process other listener port numbers
-    send_thread = threading.Thread(target=send_messages, args=(username, client_socket, listener_port,))
-    send_thread.start()
+    app = QApplication(sys.argv)
+    signInDialog = createSignInDialog(client_socket, listener_socket, listener_port)
+    signInDialog.show()
+    app.exec_()
 
-    # So it does not block the server communication but still sets up listener
-    listener_thread = threading.Thread(target=listener_handler, args=(username, listener_socket,))
-    listener_thread.start()
-    listener_thread.join()
+    username = ast.literal_eval(client_socket.recv(1024).decode())
 
-    client_socket.close()
+    if username:
+        print("Sign in successful.")
+        signInDialog.close()
+
+        # Receive and process other listener port numbers
+        send_thread = threading.Thread(target=send_messages, args=(username, client_socket, listener_port,))
+        send_thread.start()
+
+        # So it does not block the server communication but still sets up listener
+        listener_thread = threading.Thread(target=listener_handler, args=(username, listener_socket,))
+        listener_thread.start()
+        listener_thread.join()
+
+    else:
+        print("Invalid username or password.")
+        
 
 if __name__ == "__main__":
     main()
+    
+

@@ -54,15 +54,13 @@ def signup(username, password):
     session.add(new_user)
     try:
         session.commit()
-        print("User signed up successfully.")
+        return True
+    
     except IntegrityError:
         session.rollback()
-        print("Username already exists. Please choose another username.")
+        return False
 
 # Function to sign in a user
 def signin(username, password):
     user = session.query(User).filter_by(username=username, password=password).first()
-    if user:
-        print("Sign in successful.")
-    else:
-        print("Invalid username or password.")
+    return True if user else False

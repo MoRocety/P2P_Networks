@@ -1,8 +1,8 @@
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QWidget, QSpacerItem, QSizePolicy
 from PyQt5.QtCore import Qt
-from database import signin, signup
+import ast
 
-def createSignInDialog():
+def createSignInDialog(client_socket, listener_socket, listener_port):
     dialog = QDialog()
     main_layout = QVBoxLayout(dialog)
 
@@ -34,12 +34,12 @@ def createSignInDialog():
 
     signin_button = QPushButton("Sign In")
     signin_button.setFixedWidth(100)
-    signin_button.clicked.connect(lambda: signin_clicked(username_edit, password_edit))
+    signin_button.clicked.connect(lambda: signin_clicked(username_edit, password_edit, client_socket, listener_port, dialog))
     buttons_layout.addWidget(signin_button)
 
     signup_button = QPushButton("Sign Up")
     signup_button.setFixedWidth(100)
-    signup_button.clicked.connect(lambda: signup_clicked(username_edit, password_edit))
+    signup_button.clicked.connect(lambda: signup_clicked(username_edit, password_edit, client_socket))
     buttons_layout.addWidget(signup_button)
 
     central_layout.addLayout(buttons_layout)
@@ -79,23 +79,36 @@ def createSignInDialog():
 
     return dialog
 
-def signin_clicked(username_edit, password_edit):
+def signin_clicked(username_edit, password_edit, client_socket, listener_port, dialog):
     username = username_edit.text()
     password = password_edit.text()
+
     if username and password:
-        signin(username, password)
-        clear_input_boxes([username_edit, password_edit])  # Clear input boxes after sign-in attempt
+        clear_input_boxes([username_edit, password_edit])
+    
+    else:
+        print("Please enter both username and password.")
+        
+    client_socket.send(f"/signin {username},{password},{listener_port}".encode())
+
+def signup_clicked(username_edit, password_edit, client_socket):
+    username = username_edit.text()
+    password = password_edit.text()
+
+    if username and password:
+        clear_input_boxes([username_edit, password_edit])
     else:
         print("Please enter both username and password.")
 
-def signup_clicked(username_edit, password_edit):
-    username = username_edit.text()
-    password = password_edit.text()
-    if username and password:
-        signup(username, password)
-        clear_input_boxes([username_edit, password_edit])  # Clear input boxes after sign-up attempt
+    client_socket.send(f"/signup {username},{password}".encode())
+    signed_up = ast.literal_eval(client_socket.recv(1024).decode())
+
+    if signed_up:
+        print("User signed up successfully.")
+
     else:
-        print("Please enter both username and password.")
+        print("Username already exists. Please choose another username.")
+    
 
 def clear_input_boxes(entry_boxes):
     for entry_box in entry_boxes:
