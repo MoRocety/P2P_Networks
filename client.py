@@ -6,7 +6,6 @@ host = '127.0.0.1'
 central_server_port = 55555
 connections = {}
 
-
 # Only receives from the p2p connection
 def receive_messages(p2p_conn):
     while True:

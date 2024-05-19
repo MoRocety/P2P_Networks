@@ -1,77 +1,6 @@
-import os
-import sys
-from PyQt5.QtWidgets import QApplication, QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QWidget, QSpacerItem, QSizePolicy
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QHBoxLayout, QWidget, QSpacerItem, QSizePolicy
 from PyQt5.QtCore import Qt
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
-from sqlalchemy.exc import IntegrityError
-
-# Function to drop (delete) the database file
-def drop_database():
-    if os.path.exists('chat_system.db'):
-        os.remove('chat_system.db')
-        print("Database dropped successfully.")
-    else:
-        print("Database file not found.")
-
-inp = int(input("Do we drop the db (0 for No, 1 for Yes): "))
-
-if inp == 1:
-    drop_database()
-
-# Create an engine to connect to your database
-engine = create_engine('sqlite:///chat_system.db', echo=False)
-
-# Create a base class for declarative class definitions
-Base = declarative_base()
-
-# Define your database schema by defining classes
-class User(Base):
-    __tablename__ = 'users'
-    username = Column(String, primary_key=True)
-    password = Column(String)
-
-class Message(Base):
-    __tablename__ = 'messages'
-    message_id = Column(Integer, primary_key=True)
-    message = Column(String)
-
-class UserChat(Base):
-    __tablename__ = 'user_chats'
-    sender_username = Column(String, ForeignKey('users.username'), primary_key=True)
-    receiver_username = Column(String, ForeignKey('users.username'), primary_key=True)
-    message_id = Column(Integer, ForeignKey('messages.message_id'), primary_key=True)
-
-    sender = relationship('User', foreign_keys=[sender_username])
-    receiver = relationship('User', foreign_keys=[receiver_username])
-    message = relationship('Message')
-
-# Create the tables in the database
-Base.metadata.create_all(engine)
-
-# Create a session to interact with the database
-Session = sessionmaker(bind=engine)
-session = Session()
-
-# Function to sign up a new user
-def signup(username, password):
-    new_user = User(username=username, password=password)
-    session.add(new_user)
-    try:
-        session.commit()
-        print("User signed up successfully.")
-    except IntegrityError:
-        session.rollback()
-        print("Username already exists. Please choose another username.")
-
-# Function to sign in a user
-def signin(username, password):
-    user = session.query(User).filter_by(username=username, password=password).first()
-    if user:
-        print("Sign in successful.")
-    else:
-        print("Invalid username or password.")
+from database import signin, signup
 
 def createSignInDialog():
     dialog = QDialog()
@@ -171,10 +100,3 @@ def signup_clicked(username_edit, password_edit):
 def clear_input_boxes(entry_boxes):
     for entry_box in entry_boxes:
         entry_box.clear()
-
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-
-    signInDialog = createSignInDialog()
-    signInDialog.show()
-    sys.exit(app.exec_())
