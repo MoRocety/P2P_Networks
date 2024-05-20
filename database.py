@@ -64,3 +64,22 @@ def signup(username, password):
 def signin(username, password):
     user = session.query(User).filter_by(username=username, password=password).first()
     return True if user else False
+
+def save_message(sender_username, receiver_username, message_text):
+    new_message = Message(message=message_text)
+    session.add(new_message)
+    session.flush()  # Flush to get the message_id before committing
+
+    user_chat = UserChat(
+        sender_username=sender_username,
+        receiver_username=receiver_username,
+        message_id=new_message.message_id
+    )
+    
+    session.add(user_chat)
+    try:
+        session.commit()
+        return True
+    except IntegrityError:
+        session.rollback()
+        return False

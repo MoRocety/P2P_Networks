@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton
 from PyQt5.QtCore import Qt
 import ast
 
-def createSignInDialog(client_socket, listener_socket, listener_port):
+def createSignInDialog(client_socket, listener_port):
     dialog = QDialog()
     main_layout = QVBoxLayout(dialog)
 

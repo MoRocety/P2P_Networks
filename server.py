@@ -34,6 +34,14 @@ def receive_messages(conn, addr):
                 
                 conn.send(username.encode())
 
+            elif data[0] == "/db":
+                names = data[1].split(",")
+                sender = names[0]
+                receiver = names[1]
+
+                message = conn.recv(1024).decode()
+                database.save_message(sender, receiver, message)
+
             print(data, listener_ports)
 
         except ConnectionResetError:
