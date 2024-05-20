@@ -34,6 +34,9 @@ def receive_messages(conn, addr):
                     messages = database.get_messages(username)
                     conn.send(f"{username}|||{messages}".encode())
                 
+                else:
+                    conn.send("/successnt".encode())
+                
             elif data[0] == "/db":
                 names = data[1].split(",")
                 sender = names[0]
@@ -41,6 +44,10 @@ def receive_messages(conn, addr):
 
                 message = conn.recv(1024).decode()
                 database.save_message(sender, receiver, message)
+
+            elif data[0] == "/signout":
+                username = data[1]
+                listener_ports.pop(username)
 
             print(data, listener_ports)
 
