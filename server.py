@@ -31,9 +31,9 @@ def receive_messages(conn, addr):
                     listener_port = int(fields[2])
                     listener_ports[username] = listener_port
                     conn.send(str(success).encode())
+                    messages = database.get_messages(username)
+                    conn.send(f"{username}|||{messages}".encode())
                 
-                conn.send(username.encode())
-
             elif data[0] == "/db":
                 names = data[1].split(",")
                 sender = names[0]
@@ -63,6 +63,7 @@ def main():
 
     while True:
         conn, addr = server_socket.accept()
+
         client_thread = threading.Thread(target=handle_client, args=(conn, addr))
         client_thread.start()
 

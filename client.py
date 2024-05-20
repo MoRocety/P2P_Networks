@@ -1,30 +1,35 @@
 import socket, threading, sys, ast, os
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTextEdit, QLineEdit, QPushButton, QVBoxLayout, QWidget, QInputDialog, QFileDialog
+from PyQt5.QtCore import pyqtSignal
 from authenticate import createSignInDialog
 from math import ceil
 
 host = '127.0.0.1'
 central_server_port = 55555
 
-class Messages:
+class Message:
     def __init__(self, sender, receiver, message):
         self.sender = sender
         self.receiver = receiver
         self.message = message
         
 class ChatWindow(QMainWindow):
-    def __init__(self, username, server_socket_, listener_port):
+    update_messages_signal = pyqtSignal()
+
+    def __init__(self, username, server_socket_, listener_port, messages_db):
         super().__init__()
 
         self.username = username
         self.chosen_username = None
         self.server_socket = server_socket_
+        self.p2p_socket = None
         self.listener_port = listener_port
         self.connections = {}
-        self.message_logs = {}
-        self.p2p_socket = None
+        self.message_logs = {user: [Message(msg["sender"], msg["receiver"], msg["message"]) for msg in msgs] for user, msgs in messages_db.items()}
 
         self.initUI()
+
+        self.update_messages_signal.connect(self.update_messages)
 
     def initUI(self):
         self.setWindowTitle(f"Chat - {self.username}")
@@ -58,7 +63,7 @@ class ChatWindow(QMainWindow):
         self.show()
 
     def send_message(self, file_flag):
-        if self.p2p_socket is not None:
+        if self.p2p_socket:
             if file_flag:
                 file_path, _ = QFileDialog.getOpenFileName(self, "Select File to Send")
                 if file_path:
@@ -76,15 +81,20 @@ class ChatWindow(QMainWindow):
                             if not chunk:
                                 break
                             self.p2p_socket.send(chunk)
-                    
+
                     self.chat_area.append(f"You sent a file: {file_name}")
 
-            else:    
+            else:
                 message = self.message_input.text()
-                self.message_input.clear()        
+                self.message_input.clear()
                 self.p2p_socket.send(f"{self.username}: {message}".encode())
-                self.chat_area.append(f"You: {message}")
 
+                if self.chosen_username in self.message_logs:
+                    self.message_logs[self.chosen_username].append(Message(self.username, self.chosen_username, message))
+                else:
+                    self.message_logs[self.chosen_username] = [Message(self.username, self.chosen_username, message)]
+
+                self.update_messages_signal.emit()
                 self.server_socket.send(f"/db {self.username},{self.chosen_username}".encode())
                 self.server_socket.send(message.encode())
         else:
@@ -99,6 +109,7 @@ class ChatWindow(QMainWindow):
             self.chosen_username, chosen_port = self.select_peer(other_listener_ports)
             if self.chosen_username:
                 self.chat_area.append(f"Connecting to {self.chosen_username} on port {chosen_port}...")
+                self.update_messages_signal.emit()
 
                 if self.chosen_username in self.connections:
                     self.p2p_socket = self.connections[self.chosen_username]
@@ -124,10 +135,8 @@ class ChatWindow(QMainWindow):
     def receive_messages(self, p2p_conn):
         while True:
             data = p2p_conn.recv(1024).decode()
-            if not data:
-                break
-            
-            elif data.split(" ")[0] == "/file":
+
+            if data.split(" ")[0] == "/file":
                 file_name = data.split(" ")[1]
                 file_chunks = int(data.split(" ")[3])
                 file_data = b''
@@ -136,16 +145,24 @@ class ChatWindow(QMainWindow):
 
                 save_path, _ = QFileDialog.getSaveFileName(self, "Save File As", file_name)
 
-                if save_path:    
+                if save_path:
                     with open(save_path, 'wb') as file:
                         file.write(file_data)
-                    self.chat_area.append(f"Received file saved as: {save_path}")    
+                    self.chat_area.append(f"Received file saved as: {save_path}")
             else:
-                self.chat_area.append(f"{data}")
+                sender = data.split(" ")[0][:-1]
+                message = " ".join(data.split(" ")[1:]).strip()
+
+                print(sender)
+                if sender in self.message_logs:
+                    self.message_logs[sender].append(Message(sender, self.username, message))
+                else:
+                    self.message_logs[sender] = [Message(sender, self.username, message)]
+
+                self.update_messages_signal.emit()
 
     def listener_handler(self, listener_socket):
         listener_socket.listen(3)
-        self.chat_area.append("Waiting for connections...")
 
         while True:
             p2p_conn, _ = listener_socket.accept()
@@ -153,6 +170,15 @@ class ChatWindow(QMainWindow):
 
             receive_thread = threading.Thread(target=self.receive_messages, args=(p2p_conn,))
             receive_thread.start()
+
+    def update_messages(self):
+        self.chat_area.clear()
+        if self.chosen_username in self.message_logs:
+            for message in self.message_logs[self.chosen_username]:
+                if message.sender == self.username and message.receiver == self.chosen_username:
+                    self.chat_area.append(f"You: {message.message}")
+                elif message.receiver == self.username and message.sender == self.chosen_username:
+                    self.chat_area.append(f"{message.sender}: {message.message}")
 
 def main():
     # Client to Server connection
@@ -168,12 +194,15 @@ def main():
     signInDialog = createSignInDialog(client_socket, listener_port)
     signInDialog.show()
     app.exec_()
-
-    username = client_socket.recv(1024).decode()
-
+    
+    data = client_socket.recv(1024).decode().split("|||")
+    username = data[0]
     if username:
         # Launch Chat Window
-        chat_window = ChatWindow(username, client_socket, listener_port)
+        message_db = data[1]
+        print(message_db)
+        message_db = ast.literal_eval(message_db)
+        chat_window = ChatWindow(username, client_socket, listener_port, message_db)
 
         # Start listener thread
         listener_thread = threading.Thread(target=chat_window.listener_handler, args=(listener_socket,))

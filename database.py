@@ -14,6 +14,9 @@ def drop_database():
     else:
         print("Database file not found.")
 
+if input("Enter Yes to drop the database: ") == "Yes":
+    drop_database()
+
 # Create an engine to connect to your database
 engine = create_engine(DATABASE_URL, echo=False)
 
@@ -75,7 +78,7 @@ def save_message(sender_username, receiver_username, message_text):
         receiver_username=receiver_username,
         message_id=new_message.message_id
     )
-    
+
     session.add(user_chat)
     try:
         session.commit()
@@ -83,3 +86,27 @@ def save_message(sender_username, receiver_username, message_text):
     except IntegrityError:
         session.rollback()
         return False
+    
+def get_messages(username):
+    messages_dict = {}
+    
+    # Query to get all messages where the given user is either the sender or receiver
+    user_chats = session.query(UserChat).join(Message).filter(
+        (UserChat.sender_username == username) | (UserChat.receiver_username == username)
+    ).all()
+
+    for user_chat in user_chats:
+        other_username = user_chat.receiver_username if user_chat.sender_username == username else user_chat.sender_username
+        
+        if other_username not in messages_dict:
+            messages_dict[other_username] = []
+        
+        message_info = {
+            "sender": user_chat.sender_username,
+            "receiver": user_chat.receiver_username,
+            "message": user_chat.message.message
+        }
+        
+        messages_dict[other_username].append(message_info)
+    
+    return messages_dict
